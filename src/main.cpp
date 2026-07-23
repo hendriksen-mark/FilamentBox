@@ -1,85 +1,20 @@
-/**
- * FilamentBox Arduino code by Walt Moorhouse.
- * MOCK_MODE is for testing changes to the logic without having to connect all the sensor. It can be run on an Uno or a Mega.
- * You must have a Mega to run with actual hardware.
- */
-
-// Comment out to run with actual hardware, unncomment to run in MOCK mode.
-// #define MOCK_MODE
-// #define DEBUG_MODE
-
-// #define CHECK_TOLERANCE
-
-#define COMMAND_MAX_SIZE 25
-#define RESPONSE_MAX_SIZE 10
+#include "config.h"
 
 #ifndef MOCK_MODE
-#include <Arduino.h>
 #include <ClickEncoder.h>
 #include <DHT.h>
 #include <DHT_U.h>
 #include <HX711.h>
 #include <SPI.h>
 #include <SD.h>
-#include <TimerThree.h>
+#include <TimerOne.h>
 #include <Wire.h>
 
 // Arducam OLED display
-#include "ArducamSSD1306.h" // Modification of Adafruit_SSD1306 for ESP8266 compatibility
-#include "Adafruit_GFX.h"   // Needs a little change in original Adafruit library
+#include <Adafruit_SSD1306.h>
+#include "Adafruit_GFX.h"
 
-#define OLED_RESET 16 // Pin 15 -RESET digital signal
-#define LOGO16_GLCD_HEIGHT 16
-#define LOGO16_GLCD_WIDTH 16
-
-ArducamSSD1306 display(OLED_RESET); // FOR I2C
-// Arducam OLED display
-
-#define DHTTYPE DHT22
-
-#define DHTPIN 2
-#define HEATER 3
-
-#define SCALE1_DOUT 4
-#define SCALE1_CLK 5
-
-#define SCALE2_DOUT 6
-#define SCALE2_CLK 7
-
-#define SCALE3_DOUT 8
-#define SCALE3_CLK 9
-
-#define SCALE4_DOUT 10
-#define SCALE4_CLK 11
-
-#define ROT1_DT A0
-#define ROT1_CLK A1
-#define ROT1_SW 22
-
-#define ROT2_DT A2
-#define ROT2_CLK A3
-#define ROT2_SW 24
-
-#define ROT3_DT A6
-#define ROT3_CLK A7
-#define ROT3_SW 26
-
-#define ROT4_DT A8
-#define ROT4_CLK A9
-#define ROT4_SW 28
-
-#define LCD_SDA 20
-#define LCD_SCL 21
-
-#define SD_MISO 50
-#define SD_MOSI 51
-#define SD_SCLK 52
-#define SD_CS 53
-
-#define SLIDE_POT1 A10
-#define SLIDE_POT2 A11
-#define SLIDE_POT3 A12
-#define SLIDE_POT4 A13
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 HX711 scale1;
 HX711 scale2;
@@ -95,9 +30,6 @@ DHT dht(DHTPIN, DHTTYPE);
 
 #endif
 
-const int READINGS_PER_MINUTE = 10;
-const char *CALIBRATION_FILENAME = "calibration.dat";
-const char *SETTINGS_FILENAME = "settings.dat";
 int maxHumidity = 5;
 int maxTemp = 80;
 int toleranceMin1 = 256;
@@ -514,7 +446,7 @@ void setCalibrationValue(int scaleNum, float newValue)
 
 void calibrate(int scaleNum)
 {
-  Timer3.stop();
+  Timer1.stop();
   calibrationWrite(F("Entering calibration mode..."));
 #ifndef MOCK_MODE
 
@@ -543,7 +475,7 @@ void calibrate(int scaleNum)
     break;
   default:
     safeWrite(F("ERROR: Bad Scale: "), (char *)String(scaleNum).c_str());
-    Timer3.start();
+    Timer1.start();
     return;
   }
   scale.set_scale();
@@ -563,7 +495,7 @@ void calibrate(int scaleNum)
   if (strcmp(answer.c_str(), "CANCEL") == 0)
   {
     calibrationWrite(F("Calibration canceled."));
-    Timer3.start();
+    Timer1.start();
     return;
   }
   float targetKg = atof(answer.c_str());
@@ -586,14 +518,14 @@ void calibrate(int scaleNum)
     if (strcmp(answer.c_str(), "CANCEL") == 0)
     {
       calibrationWrite(F("Calibration canceled."));
-      Timer3.start();
+      Timer1.start();
       return;
     }
     else if (strcmp(answer.c_str(), "ACCEPT") == 0)
     {
       setCalibrationValue(scaleNum, currentCalibrationFactor);
       calibrationWrite(F("Calibration complete."));
-      Timer3.start();
+      Timer1.start();
       return;
     }
     else
@@ -607,7 +539,7 @@ void calibrate(int scaleNum)
   delay(2000);
 #endif
   calibrationWrite(F("Target matched. Calibration complete."));
-  Timer3.start();
+  Timer1.start();
 }
 
 void setup()
@@ -665,14 +597,14 @@ void setup()
   encoder3->setAccelerationEnabled(false);
   encoder4->setAccelerationEnabled(false);
 
-  Timer3.initialize(1000);
-  Timer3.attachInterrupt(timerIsr);
+  Timer1.initialize(1000);
+  Timer1.attachInterrupt(timerIsr);
 #endif
   Serial.println(F("INFO:Waiting on Sensors to warm up before beginning..."));
   delay(10000);
   Serial.println(F("INFO:Sensors ready."));
-  Timer3.initialize(60000000 / READINGS_PER_MINUTE);
-  Timer3.attachInterrupt(report);
+  Timer1.initialize(60000000 / READINGS_PER_MINUTE);
+  Timer1.attachInterrupt(report);
 }
 
 void loop()
