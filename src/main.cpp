@@ -1,4 +1,8 @@
 #include "config.h"
+#include "log_server.h"
+#include "custom_log.h"
+#include "ntp_client.h"
+#include "functions.h"
 
 #ifndef MOCK_MODE
 #include <ClickEncoder.h>
@@ -545,6 +549,17 @@ void calibrate(int scaleNum)
 void setup()
 {
   Serial.begin(115200);
+  REMOTE_LOG_INFO("Start ESP32");
+  ChangeNeoPixels_info();
+  infoLedFadeIn(white, 500); // Smooth startup indication
+  serialWait();
+  functions_setup();
+  delay(200);
+
+  ESP_Server_setup();
+  initializeLogServer();
+  initializeNTP();
+  ota_setup();
 
 #ifndef MOCK_MODE
   display.begin();
@@ -558,7 +573,7 @@ void setup()
   display.println(F("Please Wait..."));
   display.display();
 
-  if (!SD.begin(SD_CS))
+  if (!SD.begin(SD_CS_PIN))
   {
     Serial.println(F("ERROR: Could not initialize SD Card!"));
   }
@@ -609,6 +624,9 @@ void setup()
 
 void loop()
 {
+  wifi_loop();
+  handleNTPUpdate();
+  yield(); // Prevent watchdog reset - allows ESP32 to handle WiFi/background tasks
 #ifndef MOCK_MODE
 #ifdef CHECK_TOLERANCE
   pot1 = analogRead(SLIDE_POT1);
