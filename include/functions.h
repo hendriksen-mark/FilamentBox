@@ -5,6 +5,7 @@
 
 #include <NeoPixelBus.h>
 #include "fs_wrapper.h"
+#include <ArduinoJson.h>
 
 #include "config.h"
 #include "custom_log.h"
@@ -26,6 +27,8 @@ void infoLedError();
 void blinkLed(uint8_t count, uint16_t interval = 200);
 void factoryReset();
 void resetESP();
+bool readJsonFile(const char *path, JsonDocument &doc);
+bool writeJsonFile(const char *path, JsonDocument &doc);
 bool initializeCSVFile(const char *path, const char* header);
 bool writeCSVFile(const char *path, const String &content);
 

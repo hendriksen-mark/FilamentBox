@@ -144,81 +144,60 @@ void safeWrite(const __FlashStringHelper *msg, char *data)
 }
 
 #ifndef MOCK_MODE
-void saveCalibrationSettingsToSd()
-{
-  File file = SD.open(CALIBRATION_FILENAME, FILE_WRITE);
-  if (file)
-  {
-    file.print(scale1_calibration_factor);
-    file.print(F(" "));
-    file.print(scale2_calibration_factor);
-    file.print(F(" "));
-    file.print(scale3_calibration_factor);
-    file.print(F(" "));
-    file.print(scale4_calibration_factor);
 
-    file.close();
-  }
-  else
-  {
-    safeWrite(F("ERROR: Could not open file for writing: "), (char *)CALIBRATION_FILENAME);
-  }
+bool saveConfig()
+{
+  REMOTE_LOG_DEBUG("save config");
+  JsonDocument json;
+  json["maxHumidity"] = maxHumidity;
+  json["maxTemp"] = maxTemp;
+  json["toleranceMin1"] = toleranceMin1;
+  json["toleranceMax1"] = toleranceMax1;
+  json["toleranceMin2"] = toleranceMin2;
+  json["toleranceMax2"] = toleranceMax2;
+  json["toleranceMin3"] = toleranceMin3;
+  json["toleranceMax3"] = toleranceMax3;
+  json["toleranceMin4"] = toleranceMin4;
+  json["toleranceMax4"] = toleranceMax4;
+  json["scale1_calibration_factor"] = scale1_calibration_factor;
+  json["scale2_calibration_factor"] = scale2_calibration_factor;
+  json["scale3_calibration_factor"] = scale3_calibration_factor;
+  json["scale4_calibration_factor"] = scale4_calibration_factor;
+
+  return writeJsonFile(CALIBRATION_FILENAME, json);
 }
 
-void loadCalibrationSettingsFromSd()
+
+bool loadConfig()
 {
-  File file = SD.open(CALIBRATION_FILENAME);
-  String contents = "";
-  if (file)
+  REMOTE_LOG_DEBUG("load config");
+  JsonDocument json;
+  if (!readJsonFile(CALIBRATION_FILENAME, json))
   {
-    while (file.available())
-    {
-      contents += (char)file.read();
-    }
-    file.close();
-    char *setting = strtok((char *)contents.c_str(), " ");
-    scale1_calibration_factor = atof(setting);
-    setting = strtok(0, " ");
-    scale2_calibration_factor = atof(setting);
-    setting = strtok(0, " ");
-    scale3_calibration_factor = atof(setting);
-    setting = strtok(0, " ");
-    scale4_calibration_factor = atof(setting);
+    REMOTE_LOG_DEBUG("Create new file with default values");
+		return saveConfig();
   }
-  else
-  {
-    safeWrite(F("ERROR: Could not open file for reading: "), (char *)CALIBRATION_FILENAME);
-  }
-}
-
-void saveSettingToSd(const __FlashStringHelper *msg, char *data)
-{
-
-  File file = SD.open(SETTINGS_FILENAME, FILE_WRITE);
-  if (file)
-  {
-    file.print(scale1_calibration_factor);
-    file.print(F(" "));
-    file.print(scale2_calibration_factor);
-    file.print(F(" "));
-    file.print(scale3_calibration_factor);
-    file.print(F(" "));
-    file.print(scale4_calibration_factor);
-
-    file.close();
-  }
-  else
-  {
-    safeWrite(F("ERROR: Could not open file for writing: "), (char *)SETTINGS_FILENAME);
-  }
+  maxHumidity = json["maxHumidity"];
+  maxTemp = json["maxTemp"];
+  toleranceMin1 = json["toleranceMin1"];
+  toleranceMax1 = json["toleranceMax1"];
+  toleranceMin2 = json["toleranceMin2"];
+  toleranceMax2 = json["toleranceMax2"];
+  toleranceMin3 = json["toleranceMin3"];
+  toleranceMax3 = json["toleranceMax3"];
+  toleranceMin4 = json["toleranceMin4"];
+  toleranceMax4 = json["toleranceMax4"];
+  scale1_calibration_factor = json["scale1_calibration_factor"];
+  scale2_calibration_factor = json["scale2_calibration_factor"];
+  scale3_calibration_factor = json["scale3_calibration_factor"];
+  scale4_calibration_factor = json["scale4_calibration_factor"];
+  return true;
 }
 #endif
 
 void report(void)
 {
-#ifdef DEBUG_MODE
-  Serial.println(F("DEBUG: Begin report"));
-#endif
+  REMOTE_LOG_DEBUG(F("DEBUG: Begin report"));
   // Reading temperature or humidity takes about 250 milliseconds!
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
 #ifndef MOCK_MODE
@@ -380,9 +359,7 @@ void report(void)
   display.display();
 #endif
 
-#ifdef DEBUG_MODE
-  Serial.println(F("DEBUG: End report"));
-#endif
+  REMOTE_LOG_DEBUG(F("DEBUG: End report"));
 }
 
 String prompt(String msg)
@@ -399,10 +376,7 @@ String prompt(String msg)
       char input[RESPONSE_MAX_SIZE + 1];
       byte size = Serial.readBytes(input, RESPONSE_MAX_SIZE);
       input[size] = 0;
-#ifdef DEBUG_MODE
-      Serial.print(F("DEBUG: input[]="));
-      Serial.println(input);
-#endif
+      REMOTE_LOG_DEBUG(F("DEBUG: input[]="), input);
       return String(input);
     }
     delay(10);
@@ -444,7 +418,7 @@ void setCalibrationValue(int scaleNum, float newValue)
     break;
   }
 #ifndef MOCK_MODE
-  saveCalibrationSettingsToSd();
+  saveConfig();
 #endif
 }
 
@@ -492,10 +466,7 @@ void calibrate(int scaleNum)
   delay(1000);
   String answer = prompt(String(F("Place known weight on scale. Enter weight (in kg) and click OK.")));
 
-#ifdef DEBUG_MODE
-  Serial.print(F("DEBUG: String answer="));
-  Serial.println(answer);
-#endif
+  REMOTE_LOG_DEBUG(F("DEBUG: String answer="), answer);
   if (strcmp(answer.c_str(), "CANCEL") == 0)
   {
     calibrationWrite(F("Calibration canceled."));
@@ -573,11 +544,7 @@ void setup()
   display.println(F("Please Wait..."));
   display.display();
 
-  if (!SD.begin(SD_CS_PIN))
-  {
-    Serial.println(F("ERROR: Could not initialize SD Card!"));
-  }
-  loadCalibrationSettingsFromSd();
+  loadConfig();
 
   pinMode(HEATER, OUTPUT);
   pinMode(SLIDE_POT1, INPUT);

@@ -265,6 +265,58 @@ void resetESP()
 	ESP.restart();
 }
 
+// Generic JSON file helpers
+bool readJsonFile(const char *path, JsonDocument &doc)
+{
+	if (!fs_exists(path))
+	{
+		REMOTE_LOG_ERROR("readJsonFile: file not found", path);
+		return false;
+	}
+	File file = fs_open(path, "r");
+	if (!file)
+	{
+		REMOTE_LOG_ERROR("readJsonFile: failed to open", path);
+		return false;
+	}
+	size_t size = file.size();
+	if (size == 0)
+	{
+		REMOTE_LOG_ERROR("readJsonFile: empty file", path);
+		file.close();
+		return false;
+	}
+	// Read into string to avoid streaming issues
+	String content = file.readString();
+	file.close();
+	DeserializationError err = deserializeJson(doc, content);
+	if (err)
+	{
+		REMOTE_LOG_ERROR("readJsonFile: failed to parse", path);
+		return false;
+	}
+	return true;
+}
+
+bool writeJsonFile(const char *path, JsonDocument &doc)
+{
+	File file = fs_open(path, "w");
+	if (!file)
+	{
+		REMOTE_LOG_ERROR("failed to open for write", path);
+		return false;
+	}
+	if (serializeJson(doc, file) == 0)
+	{
+		REMOTE_LOG_ERROR("failed to write json", path);
+		file.close();
+		return false;
+	}
+	file.close();
+	return true;
+}
+
+
 bool initializeCSVFile(const char *path, const char* header)
 {
 	if (fs_exists(path))

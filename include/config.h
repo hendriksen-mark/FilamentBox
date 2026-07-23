@@ -5,7 +5,6 @@
 
 // Comment out to run with actual hardware, unncomment to run in MOCK mode.
 // #define MOCK_MODE
-// #define DEBUG_MODE
 
 // #define CHECK_TOLERANCE
 
