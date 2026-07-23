@@ -1,92 +1,14 @@
+#include <TimerOne.h>
 #include "config.h"
-#include "log_server.h"
 #include "custom_log.h"
 #include "ntp_client.h"
 #include "functions.h"
+#include "globals.h"
+#include "climate.h"
 
-#ifndef MOCK_MODE
-#include <ClickEncoder.h>
-#include <DHT.h>
-#include <DHT_U.h>
-#include <HX711.h>
-#include <SPI.h>
-#include <SD.h>
-#include <TimerOne.h>
-#include <Wire.h>
-
-// Arducam OLED display
-#include <Adafruit_SSD1306.h>
-#include "Adafruit_GFX.h"
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-HX711 scale1;
-HX711 scale2;
-HX711 scale3;
-HX711 scale4;
-
-ClickEncoder *encoder1;
-ClickEncoder *encoder2;
-ClickEncoder *encoder3;
-ClickEncoder *encoder4;
-
-DHT dht(DHTPIN, DHTTYPE);
-
+#ifdef MOCK_MODE
+#include "mock_data.h"
 #endif
-
-int maxHumidity = 5;
-int maxTemp = 80;
-int toleranceMin1 = 256;
-int toleranceMax1 = 768;
-int toleranceMin2 = 256;
-int toleranceMax2 = 768;
-int toleranceMin3 = 256;
-int toleranceMax3 = 768;
-int toleranceMin4 = 256;
-int toleranceMax4 = 768;
-bool out_of_tolerance1 = false;
-bool out_of_tolerance2 = false;
-bool out_of_tolerance3 = false;
-bool out_of_tolerance4 = false;
-
-float scale1_calibration_factor = -421000;
-float scale2_calibration_factor = -421000;
-float scale3_calibration_factor = -421000;
-float scale4_calibration_factor = -421000;
-
-#ifndef MOCK_MODE
-float l1 = 0.00;
-float l2 = 0.00;
-float l3 = 0.00;
-float l4 = 0.00;
-int b1 = -1;
-int b2 = -1;
-int b3 = -1;
-int b4 = -1;
-
-int pot1 = -1;
-int pot2 = -1;
-int pot3 = -1;
-int pot4 = -1;
-#else
-float w1 = 1.23;
-float w2 = 2.34;
-float w3 = 3.45;
-float w4 = 4.56;
-
-float l1 = 100.12;
-float l2 = 50.34;
-float l3 = 75.56;
-float l4 = 150.78;
-
-int pot1 = 512;
-int pot2 = 498;
-int pot3 = 750;
-int pot4 = 512;
-#endif
-
-bool heaterPowerOn = true;
-bool writingToSerial = false;
 
 #ifndef MOCK_MODE
 void timerIsr()
@@ -143,7 +65,7 @@ void safeWrite(const __FlashStringHelper *msg, char *data)
   writingToSerial = false;
 }
 
-#ifndef MOCK_MODE
+#if !defined(MOCK_MODE) || defined(USE_LITTLEFS)
 
 bool saveConfig()
 {
@@ -198,41 +120,6 @@ bool loadConfig()
 void report(void)
 {
   REMOTE_LOG_DEBUG(F("DEBUG: Begin report"));
-  // Reading temperature or humidity takes about 250 milliseconds!
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-#ifndef MOCK_MODE
-  float h = dht.readHumidity();
-  // Read temperature as Celsius
-  float t = dht.readTemperature();
-#else
-  float h = 15.123;
-  float t = 42.536;
-#endif
-
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(h) || isnan(t))
-  {
-    Serial.println(F("ERROR: Failed to read from DHT sensor!"));
-    return;
-  }
-
-  if (t > maxTemp)
-  {
-    heaterPowerOn = false;
-#ifndef MOCK_MODE
-    digitalWrite(HEATER, HIGH);
-#endif
-  }
-  else
-  {
-    if (h > maxHumidity)
-    {
-      heaterPowerOn = true;
-#ifndef MOCK_MODE
-      digitalWrite(HEATER, LOW);
-#endif
-    }
-  }
 
 #ifndef MOCK_MODE
   float w1 = scale1.get_units();
@@ -248,9 +135,9 @@ void report(void)
   }
   writingToSerial = true;
   Serial.print(F("H:"));
-  Serial.print(h);
+  Serial.print(currentHumidity);
   Serial.print(F("% T:"));
-  Serial.print(t);
+  Serial.print(currentTemp);
   Serial.print(F("C S1:"));
   Serial.print(w1);
   Serial.print(F("kg S2:"));
@@ -268,14 +155,7 @@ void report(void)
   Serial.print(F("mm L4:"));
   Serial.print(l4);
   Serial.print(F("mm P:"));
-  if (heaterPowerOn)
-  {
-    Serial.println(F("ON"));
-  }
-  else
-  {
-    Serial.println(F("OFF"));
-  }
+  Serial.print(heaterPowerOn ? F("ON") : F("OFF"));
   writingToSerial = false;
 
 #ifndef MOCK_MODE
@@ -284,9 +164,9 @@ void report(void)
 
   display.setTextSize(2);
   display.setCursor(0, 0);
-  display.print(h, 1);
+  display.print(currentHumidity, 1);
   display.print(F("%"));
-  display.print(t, 1);
+  display.print(currentTemp, 1);
   display.println(F("C"));
 
   display.setTextSize(1);
@@ -552,7 +432,7 @@ void setup()
   pinMode(SLIDE_POT3, INPUT);
   pinMode(SLIDE_POT4, INPUT);
 
-  dht.begin();
+  setupDHTSensor();
 
   scale1.begin(SCALE1_DOUT, SCALE1_CLK);
   scale1.set_scale(scale1_calibration_factor);
@@ -581,18 +461,25 @@ void setup()
 
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr);
+
+#else
+  REMOTE_LOG_INFO("MOCK_MODE: Using mock data for testing.");
+  mock();
 #endif
   Serial.println(F("INFO:Waiting on Sensors to warm up before beginning..."));
   delay(10000);
   Serial.println(F("INFO:Sensors ready."));
   Timer1.initialize(60000000 / READINGS_PER_MINUTE);
   Timer1.attachInterrupt(report);
+  Timer1.attachInterrupt(readDHTSensor);
+  Timer1.initialize(NTP_UPDATE_INTERVAL);
+  Timer1.attachInterrupt(handleNTPUpdate);
+
 }
 
 void loop()
 {
   wifi_loop();
-  handleNTPUpdate();
   yield(); // Prevent watchdog reset - allows ESP32 to handle WiFi/background tasks
 #ifndef MOCK_MODE
 #ifdef CHECK_TOLERANCE

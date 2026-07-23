@@ -4,7 +4,7 @@
 #pragma once
 
 // Comment out to run with actual hardware, unncomment to run in MOCK mode.
-// #define MOCK_MODE
+//#define MOCK_MODE
 
 // #define CHECK_TOLERANCE
 
@@ -28,6 +28,8 @@
 
 #define DHTPIN 2
 #define HEATER 3
+#define FAN 14
+#define HEATER_ACTIVE_LOW true
 
 #define SCALE1_DOUT 4
 #define SCALE1_CLK 5
